@@ -14,7 +14,7 @@ Add real-time music effects to AI CLI tool token output. TokenTone wraps CLI com
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/tokentone.git
+git clone https://github.com/BozhengLong/tokentone.git
 cd tokentone
 
 # Install dependencies
