@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
+import { spawn } from 'child_process';
 import { PTYWrapper } from './pty/wrapper';
 import { AudioEngine } from './audio/engine';
 import { getTheme, getAllThemes, isValidTheme, ThemeName } from './themes';
+import { Tokenizer } from './pty/tokenizer';
 
 const program = new Command();
 
@@ -106,6 +108,101 @@ program
       console.log(`  ${theme.name.padEnd(12)} ${theme.displayName}`);
       console.log(`  ${''.padEnd(12)} ${theme.description}`);
       console.log(`  ${''.padEnd(12)} BPM: ${theme.bpm}\n`);
+    });
+  });
+
+// Ask command: use Claude's streaming output for true token-by-token audio
+program
+  .command('ask <prompt>')
+  .description('Ask Claude a question with audio effects (non-interactive)')
+  .option('-v, --volume <level>', 'Volume level (0.0-1.0)', '0.7')
+  .option('-t, --theme <name>', 'Audio theme (lofi, ambient, synthwave)', 'lofi')
+  .action(async (prompt: string, options) => {
+    if (!isValidTheme(options.theme)) {
+      console.error(`Invalid theme: ${options.theme}`);
+      process.exit(1);
+    }
+
+    const volume = parseFloat(options.volume);
+    if (isNaN(volume) || volume < 0 || volume > 1) {
+      console.error('Volume must be a number between 0.0 and 1.0');
+      process.exit(1);
+    }
+
+    const theme = getTheme(options.theme as ThemeName);
+    const audioEngine = new AudioEngine({ volume, theme, enabled: true });
+    await audioEngine.initialize();
+
+    const tokenizer = new Tokenizer();
+
+    // Use Claude's streaming JSON output
+    const claude = spawn('claude', [
+      '--print',
+      '--verbose',
+      '--output-format', 'stream-json',
+      prompt
+    ], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+
+    let buffer = '';
+
+    claude.stdout?.on('data', (data: Buffer) => {
+      buffer += data.toString();
+
+      // Process complete JSON lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const json = JSON.parse(line);
+
+          // Handle assistant message (contains the response text)
+          if (json.type === 'assistant' && json.message?.content) {
+            for (const content of json.message.content) {
+              if (content.type === 'text' && content.text) {
+                // Simulate streaming by outputting character by character
+                const text = content.text;
+                let i = 0;
+                const interval = setInterval(() => {
+                  if (i >= text.length) {
+                    clearInterval(interval);
+                    console.log(); // New line at end
+                    return;
+                  }
+                  // Output a few characters at a time
+                  const chunk = text.slice(i, i + 3);
+                  process.stdout.write(chunk);
+                  i += 3;
+
+                  // Trigger audio for tokens
+                  const tokens = tokenizer.tokenize(chunk);
+                  for (const token of tokens) {
+                    audioEngine.onToken(token);
+                  }
+                }, 50); // 50ms per chunk for a nice typing effect
+              }
+            }
+          }
+          // Handle result message (final output)
+          else if (json.type === 'result' && json.result) {
+            // Already handled by assistant message, skip
+          }
+        } catch {
+          // Not valid JSON, ignore
+        }
+      }
+    });
+
+    claude.stderr?.on('data', (data: Buffer) => {
+      // Suppress verbose stderr output
+    });
+
+    claude.on('exit', (code) => {
+      // Give time for the simulated streaming to finish
+      setTimeout(() => process.exit(code ?? 0), 2000);
     });
   });
 

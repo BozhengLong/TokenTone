@@ -90,28 +90,67 @@ export class PTYWrapper extends EventEmitter {
     // Create temp file for output capture
     this.outputFile = path.join(os.tmpdir(), `tokentone-${Date.now()}.log`);
 
-    // Use 'script' command to capture output while maintaining TTY
-    // -q: quiet mode, -F: flush after each write
-    const scriptArgs = process.platform === 'darwin'
-      ? ['-q', '-F', this.outputFile, '/bin/zsh', '-c', command]
-      : ['-q', '-f', this.outputFile, '-c', command];
+    // Try to use unbuffer for better streaming, fall back to script
+    // unbuffer disables output buffering for better real-time capture
+    const useUnbuffer = this.commandExists('unbuffer');
 
-    const child = spawn('script', scriptArgs, {
-      stdio: 'inherit',
-      cwd: process.cwd(),
-      env: process.env,
-    });
+    let child: ChildProcess;
+
+    if (useUnbuffer) {
+      // unbuffer provides better real-time output
+      child = spawn('unbuffer', ['-p', '/bin/zsh', '-c', command], {
+        stdio: ['inherit', 'pipe', 'pipe'],
+        cwd: process.cwd(),
+        env: process.env,
+      });
+
+      // Capture stdout/stderr and write to file + terminal
+      child.stdout?.on('data', (data: Buffer) => {
+        const str = data.toString();
+        process.stdout.write(str);
+        fs.appendFileSync(this.outputFile!, str);
+        this.handleData(str, options);
+      });
+
+      child.stderr?.on('data', (data: Buffer) => {
+        const str = data.toString();
+        process.stderr.write(str);
+        fs.appendFileSync(this.outputFile!, str);
+        this.handleData(str, options);
+      });
+    } else {
+      // Fall back to script command
+      // -q: quiet mode, -F: flush after each write
+      const scriptArgs = process.platform === 'darwin'
+        ? ['-q', '-F', this.outputFile, '/bin/zsh', '-c', command]
+        : ['-q', '-f', this.outputFile, '-c', command];
+
+      child = spawn('script', scriptArgs, {
+        stdio: 'inherit',
+        cwd: process.cwd(),
+        env: process.env,
+      });
+
+      // Watch the output file for changes
+      this.startWatching(options);
+    }
 
     this.process = child;
-
-    // Watch the output file for changes
-    this.startWatching(options);
 
     child.on('exit', (code) => {
       this.stopWatching();
       if (options.onExit) options.onExit(code ?? 0);
       this.emit('exit', code ?? 0);
     });
+  }
+
+  private commandExists(cmd: string): boolean {
+    try {
+      require('child_process').execSync(`which ${cmd}`, { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private startWatching(options: WrapperOptions): void {
@@ -135,7 +174,7 @@ export class PTYWrapper extends EventEmitter {
         this.lastSize = stats.size;
         this.handleData(newData, options);
       }
-    }, 50); // Poll every 50ms
+    }, 20); // Poll every 20ms for more granular detection
 
     // Store interval ID for cleanup
     (this as any)._pollInterval = pollInterval;
