@@ -5,7 +5,9 @@
   "main": "dist/hook.js",
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "pretest": "npm run build",
+    "test": "node test/smoke.test.mjs"
   },
   "keywords": [
     "claude-code",
