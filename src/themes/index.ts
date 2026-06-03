@@ -1,4 +1,5 @@
-import { Theme, ThemeName, AVAILABLE_THEMES } from './types';
+import { AVAILABLE_THEMES } from './types';
+import type { Theme, ThemeName } from './types';
 import { lofiTheme } from './lofi';
 import { ambientTheme } from './ambient';
 import { synthwaveTheme } from './synthwave';
@@ -21,5 +22,6 @@ export function isValidTheme(name: string): name is ThemeName {
   return AVAILABLE_THEMES.includes(name as ThemeName);
 }
 
-export { Theme, ThemeName, AVAILABLE_THEMES };
+export type { Theme, ThemeName };
+export { AVAILABLE_THEMES };
 export { lofiTheme, ambientTheme, synthwaveTheme };

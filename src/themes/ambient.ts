@@ -1,4 +1,4 @@
-import { Theme } from './types';
+import type { Theme } from './types';
 
 // Glass: gentle crystalline bell — submit feels like a calm intention, not a click
 // Submarine: deep resonant ping — processing, something moving underwater

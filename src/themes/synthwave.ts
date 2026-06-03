@@ -1,4 +1,4 @@
-import { Theme } from './types';
+import type { Theme } from './types';
 
 // Ping: sharp electric attack — submit is crisp, confident, machine-like
 // Funk: natural bass thud — the weight of work beginning, mechanical feel

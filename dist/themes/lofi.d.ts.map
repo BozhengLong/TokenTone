@@ -1,1 +1,1 @@
-{"version":3,"file":"lofi.d.ts","sourceRoot":"","sources":["../../src/themes/lofi.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,KAAK,EAAE,MAAM,SAAS,CAAC;AAMhC,eAAO,MAAM,SAAS,EAAE,KAiBvB,CAAC"}
+{"version":3,"file":"lofi.d.ts","sourceRoot":"","sources":["../../src/themes/lofi.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,KAAK,EAAE,MAAM,SAAS,CAAC;AAMrC,eAAO,MAAM,SAAS,EAAE,KAiBvB,CAAC"}

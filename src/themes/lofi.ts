@@ -1,4 +1,4 @@
-import { Theme } from './types';
+import type { Theme } from './types';
 
 // Tink: clean high bell — "message confirmed, I heard you"
 // Bottle: hollow woody mid — warm machinery starting, unobtrusive
