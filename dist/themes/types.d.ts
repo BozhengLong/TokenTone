@@ -22,9 +22,6 @@ export interface Theme {
     displayName: string;
     description: string;
     bpm: number;
-    bpmRange: [number, number];
-    subdivision: number;
-    swing: number;
     sounds: ThemeSounds;
     characteristics: string[];
 }

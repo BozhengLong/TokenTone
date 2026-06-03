@@ -11,9 +11,6 @@ exports.synthwaveTheme = {
     displayName: 'Synthwave',
     description: 'Punchy and electric — mechanical weight on every event',
     bpm: 115,
-    bpmRange: [105, 125],
-    subdivision: 4,
-    swing: 0,
     sounds: {
         submit: { sound: 'Ping', volume: 0.55 },
         active: { sound: 'Funk', volume: 0.52 },

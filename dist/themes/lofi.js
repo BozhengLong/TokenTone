@@ -10,9 +10,6 @@ exports.lofiTheme = {
     displayName: 'Lo-fi',
     description: 'Warm and unhurried — each event says exactly one thing',
     bpm: 80,
-    bpmRange: [70, 85],
-    subdivision: 4,
-    swing: 0.15,
     sounds: {
         submit: { sound: 'Tink', volume: 0.50 },
         active: { sound: 'Bottle', volume: 0.45 },
