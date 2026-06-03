@@ -27,7 +27,7 @@ TokenTone 是一个 Claude Code 插件，在你 vibe coding 的过程中提供�
    - 所有逻辑本地运行，无网络请求
 
 3. **轻便是第一优先级**
-   - 无常驻 daemon（watcher 是临时进程，随响应生随响应灭）
+   - 无常驻 daemon、无后台进程：每个 hook 是一次性短命进程，播完音就退出
    - 状态用 JSON 文件传递（几十字节）
    - 每个 hook 脚本 < 20ms
    - 用户安装后什么都不需要管
@@ -36,15 +36,17 @@ TokenTone 是一个 Claude Code 插件，在你 vibe coding 的过程中提供�
 
 ## 情感弧线状态机
 
+每个事件落到一个阶段，每个阶段对应主题里**固定指定**的一个系统声音（见下方音频系统）。
+音符在下一个 BPM 节拍上播放（scheduler 量化），播完即退出——没有后台节拍器。
+
 ```
-事件                    状态          音效特征
+事件                    状态          播放的声音
 ────────────────────────────────────────────────
-UserPromptSubmit  →   start         轻柔单音，期待感    vol×0.5
-PostToolUse #1-2  →   active        干净音符           vol×0.6
-PostToolUse #3+   →   intense       更活跃的音符池      vol×0.8
-（响应过程中）    →   watcher       BPM节拍持续播放
-Stop              →   resolving     收尾音符，余韵感    vol×0.5
-距上次事件 >60s   →   idle          视为新 session，重置
+UserPromptSubmit  →   start         theme.sounds.submit
+PostToolUse #1-2  →   active        theme.sounds.active
+PostToolUse #3+   →   intense       theme.sounds.intense
+Stop              →   resolving     theme.sounds.resolving
+距上次事件 >60s   →   idle          视为新 session，callCount 重置
 ```
 
 ---
@@ -55,63 +57,65 @@ Stop              →   resolving     收尾音符，余韵感    vol×0.5
 Claude Code
   │
   ├─ UserPromptSubmit hook
-  │       └── hook.js：记录 start 状态，spawn watcher（detached）
-  │
-  ├─ watcher.js（后台，临时）
-  │       └── 按主题 BPM 节拍持续播放音符
-  │           监听 signal 文件决定是否停止
+  │       └── hook.js：phase=start，callCount 归零，播 submit 音
+  │                    （并清理旧版本可能残留的 watcher 进程）
   │
   ├─ PostToolUse hook
-  │       └── hook.js：更新状态（active→intense），播放单音
+  │       └── hook.js：callCount++，active(#1-2) / intense(#3+)，播对应音
   │
   ├─ Stop hook
-  │       └── hook.js：写停止信号，watcher 收到后播放收尾音退出
+  │       └── hook.js：phase=resolving，播收尾音
   │
   └─ statusline（每 ~300ms）
           └── statusline.js：显示 ♪ lofi │ vol:70% │ ●，轻量无音频
 ```
 
+每个 hook 都是同一个 `hook.js`：读 stdin 里的事件 → 推进状态机 → 在下一个节拍播一个音 → 退出。
+没有 watcher、没有后台进程。
+
 ### 关键文件
 
 | 文件 | 职责 |
 |------|------|
-| `src/hook.ts` | Hook 入口：状态转移 + spawn/signal watcher |
-| `src/watcher.ts` | 后台节拍器：BPM 驱动，响应期间持续播放 |
+| `src/hook.ts` | Hook 入口:状态转移 + 在下一拍播放对应阶段的音 |
 | `src/statusline.ts` | 状态栏显示，纯显示，无音频 |
 | `src/state.ts` | 运行时状态读写（~/.claude/plugins/tokentone/state.json） |
 | `src/config.ts` | 用户配置读写（~/.claude/plugins/tokentone/config.json） |
-| `src/audio/sampler.ts` | 调用 afplay/aplay 播放音频，复用系统声音作为后备 |
+| `src/audio/sampler.ts` | `playSystemSound()`：用 afplay 播放 macOS 系统声音 |
 | `src/audio/scheduler.ts` | BPM 节拍量化，让音符对齐节拍而非机械触发 |
 
 ### 进程通信方式
 
-- **状态传递**：`state.json`（phase、callCount、lastNoteAt 等）
-- **停止信号**：`watcher.signal` 文件（Stop hook 写入，watcher 轮询读取）
+- **状态传递**：`state.json`（phase、callCount、lastEventAt、sessionStartedAt、lastNoteAt）
 - **用户配置**：`config.json`（theme、volume、enabled、triggers）
+
+> 注：`hook.ts` 仍保留 `killOldWatcher()`，仅用于在升级后清理旧版本残留的
+> watcher 进程（读 `watcher.pid`、写 `watcher.signal`）。当前架构本身不再使用 watcher。
 
 ---
 
 ## 音频系统
 
-### 三个主题（macOS 系统声音后备）
+### 三个主题（macOS 系统声音）
 
-| 主题 | BPM | 声音特征 | 系统声音 |
-|------|-----|---------|---------|
-| lofi | 85 | 柔和温暖 | Tink, Pop, Purr |
-| ambient | 70 | 空灵大气 | Glass, Submarine, Purr |
-| synthwave | 110 | 有力电子 | Funk, Hero, Ping |
+每个主题为四个阶段各指定一个 macOS 系统声音 + 一个音量系数，定义在 `src/themes/*.ts` 的 `sounds` 字段里。
+不再有"音符池 + 随机选"——事件到声音是固定一对一映射。
 
-### 音符选择规则
-
-- `start` / `resolving`：最后一个音符（index = count-1，最柔/最有余韵感）
-- `active`：从前两个音符随机选（index 0 或 1）
-- `intense`：全音符池随机选（最大变化感）
+| 主题 | BPM | submit | active | intense | resolving |
+|------|-----|--------|--------|---------|-----------|
+| lofi | 80 | Tink (0.50) | Bottle (0.45) | Ping (0.55) | Glass (0.62) |
+| ambient | 65 | Glass (0.42) | Submarine (0.35) | Glass (0.50) | Submarine (0.58) |
+| synthwave | 115 | Ping (0.55) | Funk (0.52) | Ping (0.65) | Basso (0.62) |
 
 ### 音量体系
 
-- 用户设置的 `volume`（0.0-1.0）是基准
-- 各状态乘以对应系数（0.5/0.6/0.8）
-- Sampler 内部再乘以 0.3（macOS afplay 音量校准）
+最终播放音量 = `config.volume`（用户基准 0.0-1.0）× `theme.sounds.<event>.volume`（上表括号里的系数）× `0.3`（sampler 内部对 afplay 0-1 音阶的校准）。
+
+每个阶段的相对响度由主题自己表达——通常 resolving 最突出，因为它在提示"结果出来了，看这里"。
+
+### 平台
+
+音频目前仅 macOS：`Sampler.playSystemSound()` 在非 darwin 平台直接返回。statusline 在所有平台都能用。
 
 ---
 
@@ -123,13 +127,17 @@ TokenTone 是一个标准 Claude Code 插件：
 - `commands/setup.md` — `/tokentone:setup` 命令（给 Claude 的指令）
 - `commands/configure.md` — `/tokentone:configure` 命令
 
-**注意**：`dist/` 需要提交到 Git（不能在 .gitignore 里），插件系统通过 GitHub 下载整个 repo 后直接运行 `dist/hook.js`。
+**注意**：`dist/` 已提交到 Git（不在 .gitignore 里）。插件系统通过 GitHub 下载整个 repo,
+node 运行时直接跑 `dist/hook.js` / `dist/statusline.js`,bun 运行时直接跑 `src/*.ts`。
+改完 `src/` 后记得 `npm run build` 重新生成 `dist/` 再提交。
 
 ---
 
-## 当前未解决的问题
+## 当前状态 / 待办
 
-- [ ] watcher.ts 尚未实现（是下一步要做的核心功能）
-- [ ] dist/ 在 .gitignore 里，发布前需要移除
-- [ ] assets/samples/ 目录为空，目前依赖 macOS 系统声音后备
-- [ ] Linux 的 aplay 没有音量控制参数，音量体系在 Linux 上不生效
+- [x] dist/ 已移出 .gitignore 并提交
+- [x] 移除了老的 `tokentone` CLI（index/pty/rhythm/engine），项目现为纯插件
+- [ ] 音频仅 macOS：Linux/Windows 暂无声音（statusline 正常）。若要支持 Linux，
+      需在 `sampler.ts` 加 aplay/paplay 分支（注意 aplay 无音量参数）
+- [ ] `assets/samples/` 目前完全没用到——`sampler.ts` 只播 macOS 系统声音,
+      不再加载本地采样。要么接回自定义采样,要么删掉该目录
