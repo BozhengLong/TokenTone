@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ambientTheme = void 0;
+// Glass: gentle crystalline bell — submit feels like a calm intention, not a click
+// Submarine: deep resonant ping — processing, something moving underwater
+// Glass again at higher volume: intensity stays atmospheric, never urgent
+// Submarine at its deepest: the longest natural decay of any system sound,
+//   perfect for "done" — just lets the sound exist and fade completely on its own
+exports.ambientTheme = {
+    name: 'ambient',
+    displayName: 'Ambient',
+    description: 'Atmospheric and minimal — sounds that recede rather than demand',
+    bpm: 65,
+    bpmRange: [55, 75],
+    subdivision: 2,
+    swing: 0,
+    sounds: {
+        submit: { sound: 'Glass', volume: 0.42 },
+        active: { sound: 'Submarine', volume: 0.35 },
+        intense: { sound: 'Glass', volume: 0.50 },
+        resolving: { sound: 'Submarine', volume: 0.58 },
+    },
+    characteristics: [
+        'Glass on submit — quiet resonance, not a notification',
+        'Submarine on active — deep, barely-there processing sound',
+        'Glass on intense — same character, slightly louder',
+        'Submarine on resolve — deepest natural decay, room to breathe',
+    ],
+};
+//# sourceMappingURL=ambient.js.map
