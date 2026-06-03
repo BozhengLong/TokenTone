@@ -10,9 +10,6 @@ export const ambientTheme: Theme = {
   displayName: 'Ambient',
   description: 'Atmospheric and minimal — sounds that recede rather than demand',
   bpm: 65,
-  bpmRange: [55, 75],
-  subdivision: 2,
-  swing: 0,
   sounds: {
     submit:    { sound: 'Glass',     volume: 0.42 },
     active:    { sound: 'Submarine', volume: 0.35 },
