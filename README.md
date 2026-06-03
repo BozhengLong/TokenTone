@@ -1,106 +1,96 @@
 # TokenTone
 
-Add real-time music effects to AI CLI tool token output. TokenTone wraps CLI commands and plays audio samples synchronized with text output, creating an ambient soundtrack while you work with AI tools.
+Real-time ambient music for [Claude Code](https://claude.com/claude-code). TokenTone is a plugin that listens to the emotional rhythm of your coding session through Claude Code's hook system and plays sounds at the right moments — when you submit a prompt, while tools run, and when a response completes.
 
-## Features
+It's not token-by-token sound effects. Like a film score, it responds to the *arc* of a session rather than every character.
 
-- Wrap any CLI command with audio effects
-- Multiple audio themes (lofi, ambient, synthwave)
-- Token-aware audio triggering based on output patterns
-- Adjustable volume control
-- Special `ask` command for Claude CLI integration
+## How it works
+
+TokenTone hooks into three Claude Code events and advances a small state machine:
+
+| Event | Phase | What you hear |
+|-------|-------|---------------|
+| `UserPromptSubmit` | `start` | A soft single note — anticipation |
+| `PostToolUse` (#1–2) | `active` | A clean working note |
+| `PostToolUse` (#3+) | `intense` | A brighter, more present note |
+| `Stop` | `resolving` | A conclusive note with long decay |
+
+After 60 seconds of silence the session resets. Everything runs locally:
+
+- **Zero LLM calls, zero token cost** — pure algorithmic state machine, no network requests
+- **No daemon** — each hook is a short-lived process (< 20ms)
+- **Lightweight** — state passes through a tiny JSON file
+
+The statusline shows the current theme, volume, and on/off state:
+
+```
+♪ lofi │ vol:70% │ ●
+```
 
 ## Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/BozhengLong/tokentone.git
-cd tokentone
+In Claude Code:
 
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Link globally (optional)
-npm link
 ```
+/plugin marketplace add BozhengLong/TokenTone
+/plugin install tokentone
+/tokentone:setup
+```
+
+`/tokentone:setup` detects your runtime, wires up the statusline and hooks in your settings, and tests them. After it finishes, **restart Claude Code** for the statusline to take effect.
 
 ### Requirements
 
-- Node.js >= 18.0.0
-- A command-line audio player (afplay on macOS, aplay on Linux, or similar)
-- Claude CLI (for the `ask` command)
-
-## Usage
-
-### Wrap any command
-
-```bash
-tokentone <command> [args...]
-```
-
-Example:
-```bash
-tokentone claude "What is the meaning of life?"
-```
-
-### Options
-
-- `-v, --volume <level>` - Volume level from 0.0 to 1.0 (default: 0.7)
-- `-t, --theme <name>` - Audio theme: lofi, ambient, or synthwave (default: lofi)
-- `--no-audio` - Disable audio (passthrough mode)
-
-### List available themes
-
-```bash
-tokentone themes
-```
-
-### Preview a theme
-
-```bash
-tokentone themes --preview lofi
-```
-
-### Ask Claude directly
-
-The `ask` command provides a streamlined way to query Claude with audio effects:
-
-```bash
-tokentone ask "Explain quantum computing in simple terms"
-tokentone ask -t synthwave "Write a haiku about coding"
-```
+- **Claude Code**
+- **macOS** for audio — sounds use the built-in macOS system sounds (`afplay`). The statusline works on any platform; audio playback is currently macOS-only.
+- **Node.js ≥ 18** or **Bun** — Bun runs the TypeScript sources directly; Node runs the prebuilt files in `dist/`.
 
 ## Themes
 
-| Theme | Description | BPM |
-|-------|-------------|-----|
-| lofi | Chill lo-fi hip hop beats | 85 |
-| ambient | Atmospheric soundscapes | 60 |
-| synthwave | Retro 80s electronic vibes | 110 |
+| Theme | Character | BPM |
+|-------|-----------|-----|
+| **lofi** | Warm and unhurried — each event says exactly one thing | 80 |
+| **ambient** | Atmospheric and minimal — sounds that recede rather than demand | 65 |
+| **synthwave** | Punchy and electric — mechanical weight on every event | 115 |
 
-## Architecture
+Each theme maps the four phases to distinct macOS system sounds with per-event volume, so the session's intensity is expressed through both sound choice and loudness.
+
+## Configuration
+
+Run `/tokentone:configure` to change the theme, volume, enabled state, or which events trigger sound. Settings are stored in `~/.claude/plugins/tokentone/config.json`:
+
+```json
+{
+  "theme": "lofi",
+  "volume": 0.7,
+  "enabled": true,
+  "triggers": {
+    "userPromptSubmit": true,
+    "postToolUse": true,
+    "stop": true
+  }
+}
+```
+
+## Project layout
 
 ```
 tokentone/
+├── .claude-plugin/        # Plugin + marketplace metadata
+├── commands/              # /tokentone:setup and :configure
 ├── src/
-│   ├── index.ts        # CLI entry point
+│   ├── hook.ts            # Hook entry: state machine + sound selection
+│   ├── statusline.ts      # Statusline display (no audio)
+│   ├── config.ts          # User config read/write
+│   ├── state.ts           # Session state read/write
 │   ├── audio/
-│   │   └── engine.ts   # Audio playback engine
-│   ├── pty/
-│   │   ├── wrapper.ts  # PTY wrapper for command execution
-│   │   └── tokenizer.ts # Token detection
-│   └── themes/         # Theme definitions
-└── assets/
-    └── samples/        # Audio sample files
+│   │   ├── sampler.ts     # Plays named macOS system sounds
+│   │   └── scheduler.ts   # BPM beat quantization
+│   └── themes/            # lofi · ambient · synthwave
+└── dist/                  # Compiled output (committed — run by Node installs)
 ```
 
-## Known Limitations
-
-- **Claude CLI streaming**: The Claude CLI does not support true streaming output. The `ask` command simulates streaming by processing the complete response and outputting it character by character with audio effects.
-- **PTY-based wrapping**: When wrapping commands with `tokentone <command>`, audio is triggered based on PTY output chunks, which may not align perfectly with actual token boundaries.
+`dist/` is committed on purpose: the plugin is installed by cloning the repo, and Node-based installs run `dist/hook.js` / `dist/statusline.js` directly. Rebuild with `npm run build` after changing anything in `src/`.
 
 ## License
 
