@@ -1,0 +1,20 @@
+{
+  "name": "tokentone",
+  "owner": {
+    "name": "Bozheng Long",
+    "email": ""
+  },
+  "metadata": {
+    "description": "Real-time audio effects for Claude Code — plays music when tools run and responses complete",
+    "version": "0.2.0"
+  },
+  "plugins": [
+    {
+      "name": "tokentone",
+      "source": "./",
+      "description": "Plays ambient music when Claude Code tools run and responses complete. Three themes: lofi, ambient, synthwave. Statusline shows current theme and volume.",
+      "category": "productivity",
+      "tags": ["audio", "music", "lofi", "ambient", "synthwave", "hooks", "statusline"]
+    }
+  ]
+}

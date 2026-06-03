@@ -1,6 +1,6 @@
 {
   "name": "tokentone",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Add real-time music effects to AI CLI tool token output",
   "main": "dist/index.js",
   "bin": {
