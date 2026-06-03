@@ -1,7 +1,7 @@
 {
   "name": "tokentone",
   "description": "Real-time audio effects for Claude Code — plays music when tools run and responses complete",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Bozheng Long",
     "url": "https://github.com/BozhengLong"

@@ -1,6 +1,6 @@
 {
   "name": "tokentone",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Real-time ambient music for Claude Code — plays sounds as tools run and responses complete",
   "main": "dist/hook.js",
   "scripts": {
